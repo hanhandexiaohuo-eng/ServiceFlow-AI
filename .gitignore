@@ -1,0 +1,29 @@
+# 真实环境变量文件（含密码），绝不提交
+.env
+.env.*
+!.env.example
+
+# Node / 前端
+node_modules/
+frontend/dist/
+frontend/.vite/
+*.tsbuildinfo
+
+# Java / Maven
+backend-java/target/
+*.jar
+!backend-java/.mvn/wrapper/maven-wrapper.jar
+
+# Python
+ai-python/.venv/
+__pycache__/
+*.pyc
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# 日志与本地工具
+*.log
+.tools/
