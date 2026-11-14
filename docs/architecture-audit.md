@@ -256,3 +256,9 @@ com.serviceflow.ai
 ---
 
 **本报告仅审计与规划，未修改任何业务代码。等待确认后再按第 10 节顺序逐模块实施。**
+
+## 13. 用户已确认的决策（2026-11-14）
+
+1. **持久层迁移到 MyBatis**：在 ticket 加固（顺序 2）之后实施，仅改 Repository 层。
+2. **AI 路线 Java → FastAPI → DeepSeek**：Python 服务承担 AI 职责，Java 不引入 Spring AI。
+3. **重构启动时机**：等待用户先完成数据库验收（带密码启动 + 执行 `02-tickets.sql` + ready 返回 200/UP），验收通过后从顺序 1（auth+user）开始。
