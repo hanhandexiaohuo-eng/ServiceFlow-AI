@@ -2,7 +2,7 @@
 
 AI 智能工单与服务调度平台。通过 AI 对工单做分类、信息提取与处理建议生成，帮助服务团队更快定位问题、分派任务并闭环处理。
 
-当前为**第一阶段**：项目骨架 + 三个可独立运行的服务 + MySQL 连接与健康检查验证。尚未包含登录鉴权、工单业务、Redis、消息队列与 AI 工作流。
+当前进度：第一阶段（骨架+健康检查）✅ → 工单 CRUD ✅ → **模块 1：auth+user 认证** ✅。尚未包含工作流、智能调度、Redis、消息队列与 AI 工作流。
 
 ## 架构
 
@@ -65,11 +65,12 @@ GRANT ALL PRIVILEGES ON serviceflow.* TO 'serviceflow'@'localhost';
 FLUSH PRIVILEGES;
 ```
 
-建库后执行工单表迁移（第二阶段新增，可重复执行）：
+建库后按顺序执行迁移脚本（均可重复执行）：
 
 ```powershell
 # PowerShell 不支持 < 重定向，需经 cmd 执行；提示 Enter password 时输入（不回显）
 cmd /c '"C:\Program Files\MySQL\MySQL Server 8.4\bin\mysql.exe" -u serviceflow -p serviceflow < "..\deploy\init\02-tickets.sql"'
+cmd /c '"C:\Program Files\MySQL\MySQL Server 8.4\bin\mysql.exe" -u serviceflow -p serviceflow < "..\deploy\init\03-users.sql"'
 ```
 
 ### 2. Java 后端（8080）
@@ -87,6 +88,12 @@ $env:MYSQL_PORT = "3306"
 $env:MYSQL_DATABASE = "serviceflow"
 $env:MYSQL_USER = "serviceflow"
 $env:JAVA_HOME = "D:\JDK21"           # 指向本机 JDK 17+ 的安装目录
+
+# 模块 1 新增（认证）：
+# JWT 签名密钥，至少 32 字节高熵随机串；未设置或过短时应用拒绝启动（fail fast）
+$env:JWT_SECRET = "替换为高熵随机密钥，例如用 openssl rand -base64 48 生成"
+# 仅当 users 表为空时用该密码创建初始管理员 admin（至少 6 位）；表中已有用户时自动跳过
+$env:ADMIN_INITIAL_PASSWORD = "替换为初始管理员密码"
 ```
 
 > `deploy\.env` 只供 Docker Compose 使用，Spring Boot **不会**自动读取它；Java 只认进程环境变量。换一个 PowerShell 窗口后需要重新设置。
@@ -148,20 +155,24 @@ npm run dev
 
 ## 接口说明
 
-| 服务 | 接口 | 说明 |
-| --- | --- | --- |
-| Java | `GET /api/health` | 存活检查，返回 `service / status / version / timestamp` |
-| Java | `GET /api/health/ready` | 就绪检查，真实执行 `SELECT 1`；数据库不可用时返回 **503** 与 `checks[].status=DOWN` |
-| Java | `POST /api/tickets` | 创建工单（201），body：`title/type/creator` 必填，`priority` 默认 MEDIUM |
-| Java | `GET /api/tickets` | 分页查询，参数：`page`（默认 1）、`size`（默认 10，最大 100）、`status`、`priority`（可选筛选） |
-| Java | `GET /api/tickets/{id}` | 工单详情，不存在返回 404 |
-| Java | `PUT /api/tickets/{id}` | 全量更新工单 |
-| Java | `DELETE /api/tickets/{id}` | 删除工单 |
-| Python | `GET /health` | 存活检查 |
-| Python | `GET /health/ready` | 就绪检查（本阶段无外部依赖） |
+| 服务 | 接口 | 权限 | 说明 |
+| --- | --- | --- | --- |
+| Java | `POST /api/auth/login` | 公开 | 登录，body：`username/password`；成功返回 `{token, user}`，失败统一 401「用户名或密码错误」 |
+| Java | `GET /api/auth/me` | 登录 | 返回当前登录用户（id/username/name/role，不含密码哈希） |
+| Java | `GET /api/health` | 公开 | 存活检查，返回 `service / status / version / timestamp` |
+| Java | `GET /api/health/ready` | 公开 | 就绪检查，真实执行 `SELECT 1`；数据库不可用时返回 **503** |
+| Java | `POST /api/tickets` | 登录 | 创建工单（201），body：`title/type` 必填，`priority` 默认 MEDIUM；**creator 由服务端取当前登录用户显示名，客户端无权指定** |
+| Java | `GET /api/tickets` | 登录 | 分页查询，参数：`page`、`size`（最大 100）、`status`、`priority` |
+| Java | `GET /api/tickets/{id}` | 登录 | 工单详情，不存在返回 404 |
+| Java | `PUT /api/tickets/{id}` | 登录 | 全量更新工单 |
+| Java | `DELETE /api/tickets/{id}` | 仅 ADMIN | 删除工单；普通用户返回 403 |
+| Python | `GET /health` | 公开 | 存活检查 |
+| Python | `GET /health/ready` | 公开 | 就绪检查（本阶段无外部依赖） |
 
-业务接口统一返回 `{code, message, data}`；校验失败 400、资源不存在 404、服务器错误 500。
-工单状态：`OPEN / IN_PROGRESS / RESOLVED / CLOSED`；优先级：`LOW / MEDIUM / HIGH / URGENT`；类型：`INCIDENT / SERVICE_REQUEST / CHANGE / CONSULT`。
+认证方式：登录后把 `token` 放入请求头 `Authorization: Bearer <token>`，有效期 2 小时。
+除登录与健康检查外的 `/api/**` 由 AuthInterceptor 统一鉴权：Token 缺失/过期/篡改 → 401；每请求查库验证用户存在且未禁用，**角色以数据库最新值为准**。
+业务接口统一返回 `{code, message, data}`；400 参数错误、401 未登录或失效、403 权限不足、404 不存在、500 服务器错误。
+工单状态：`OPEN / IN_PROGRESS / RESOLVED / CLOSED`；优先级：`LOW / MEDIUM / HIGH / URGENT`；类型：`INCIDENT / SERVICE_REQUEST / CHANGE / CONSULT`；用户角色：`ADMIN / AGENT / USER`。
 
 前端开发服务器把 `/api` 代理到 `http://127.0.0.1:8080`（见 `frontend/vite.config.ts`），因此不存在浏览器跨域问题，也不需要在后端配置 CORS。
 
@@ -186,4 +197,4 @@ Get-Process -Id <上一步的 OwningProcess>
 
 ## 验收记录
 
-第一阶段的真实验收结果见 [docs/phase-1-acceptance.md](docs/phase-1-acceptance.md)；中断续接请看 [docs/next-session.md](docs/next-session.md)。
+第一阶段的真实验收结果见 [docs/phase-1-acceptance.md](docs/phase-1-acceptance.md)；模块 1（auth+user 认证）的设计与验收见 [docs/module-1-auth-design.md](docs/module-1-auth-design.md)、[docs/module-1-auth-acceptance.md](docs/module-1-auth-acceptance.md)；中断续接请看 [docs/next-session.md](docs/next-session.md)。
