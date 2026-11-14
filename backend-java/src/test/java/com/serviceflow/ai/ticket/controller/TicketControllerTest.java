@@ -60,7 +60,7 @@ class TicketControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"title":"打印机无法连接","description":"三楼打印机脱机",
-                                 "type":"INCIDENT","priority":"HIGH","creator":"张三"}
+                                 "type":"INCIDENT","priority":"HIGH"}
                                 """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.code").value(201))
@@ -73,7 +73,7 @@ class TicketControllerTest {
         mockMvc.perform(post("/api/tickets")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"title":"","type":"INCIDENT","creator":"张三"}
+                                {"title":"","type":"INCIDENT"}
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400))

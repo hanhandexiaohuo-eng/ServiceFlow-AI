@@ -1,6 +1,9 @@
 package com.serviceflow.ai.ticket.service;
 
+import com.serviceflow.ai.auth.context.UserContext;
+import com.serviceflow.ai.auth.enums.UserRole;
 import com.serviceflow.ai.common.dto.PageResponse;
+import com.serviceflow.ai.common.exception.ForbiddenException;
 import com.serviceflow.ai.common.exception.NotFoundException;
 import com.serviceflow.ai.ticket.dto.TicketCreateRequest;
 import com.serviceflow.ai.ticket.dto.TicketResponse;
@@ -51,7 +54,8 @@ public class TicketService {
                 ? Priority.MEDIUM.name()
                 : parseEnum(Priority.class, req.priority(), "优先级").name());
         t.setStatus(TicketStatus.OPEN.name());
-        t.setCreator(req.creator());
+        // 创建人来自登录上下文（显示名 name），客户端无权指定，防止伪造
+        t.setCreator(UserContext.getRequired().name());
         t.setAssignee(req.assignee());
         t.setCreatedAt(LocalDateTime.now());
         t.setUpdatedAt(LocalDateTime.now());
@@ -95,6 +99,10 @@ public class TicketService {
 
     @Transactional
     public void delete(Long id) {
+        // 删除是高危操作，仅管理员。权限判断放在 Service 而非前端，前端隐藏按钮只是体验优化
+        if (UserContext.getRequired().role() != UserRole.ADMIN) {
+            throw new ForbiddenException("仅管理员可删除工单");
+        }
         int affected = ticketRepository.deleteById(id);
         if (affected == 0) {
             throw new NotFoundException("工单不存在：id=" + id);

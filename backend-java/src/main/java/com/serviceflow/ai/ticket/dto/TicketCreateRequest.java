@@ -20,11 +20,8 @@ public record TicketCreateRequest(
 
         String priority,
 
-        @NotBlank(message = "创建人不能为空")
-        @Size(max = 64, message = "创建人不能超过 64 字")
-        String creator,
-
         @Size(max = 64, message = "处理人不能超过 64 字")
         String assignee
 ) {
 }
+// 注意：creator 不在请求体中，由服务端从登录上下文（UserContext）取当前用户显示名，防止伪造。
