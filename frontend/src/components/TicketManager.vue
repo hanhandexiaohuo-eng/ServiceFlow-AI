@@ -8,6 +8,7 @@ import {
   type Ticket,
   type TicketForm,
 } from '../api/tickets'
+import { getCurrentUser } from '../api/request'
 
 const STATUS_OPTIONS = ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED']
 const PRIORITY_OPTIONS = ['LOW', 'MEDIUM', 'HIGH', 'URGENT']
@@ -34,7 +35,10 @@ const errorMessage = ref('')
 
 // 弹窗状态：null 关闭；'create' 新建；否则为正在编辑的工单
 const editing = ref<Ticket | 'create' | null>(null)
-const form = reactive<TicketForm>({ title: '', description: '', type: 'INCIDENT', priority: 'MEDIUM', status: 'OPEN', creator: '', assignee: '' })
+const form = reactive<TicketForm>({ title: '', description: '', type: 'INCIDENT', priority: 'MEDIUM', status: 'OPEN', assignee: '' })
+
+// 删除按钮仅管理员可见；真正的权限校验在后端 Service 层，前端隐藏只是体验优化
+const isAdmin = getCurrentUser()?.role === 'ADMIN'
 const formError = ref('')
 const saving = ref(false)
 
@@ -65,7 +69,7 @@ function applyFilter() {
 const totalPages = () => Math.max(1, Math.ceil(total.value / size))
 
 function openCreate() {
-  Object.assign(form, { title: '', description: '', type: 'INCIDENT', priority: 'MEDIUM', status: 'OPEN', creator: '', assignee: '' })
+  Object.assign(form, { title: '', description: '', type: 'INCIDENT', priority: 'MEDIUM', status: 'OPEN', assignee: '' })
   formError.value = ''
   editing.value = 'create'
 }
@@ -147,7 +151,7 @@ onMounted(load)
         <td class="mono">{{ t.createdAt?.replace('T', ' ').slice(0, 16) }}</td>
         <td>
           <button class="link" @click="openEdit(t)">编辑</button>
-          <button class="link danger" @click="remove(t)">删除</button>
+          <button v-if="isAdmin" class="link danger" @click="remove(t)">删除</button>
         </td>
       </tr>
       <tr v-if="tickets.length === 0">
@@ -183,7 +187,6 @@ onMounted(load)
           <option v-for="s in STATUS_OPTIONS" :key="s" :value="s">{{ STATUS_LABEL[s] }}</option>
         </select>
       </label>
-      <label v-if="editing === 'create'">创建人 *<input v-model="form.creator" maxlength="64" /></label>
       <label>处理人<input v-model="form.assignee" maxlength="64" /></label>
       <p v-if="formError" class="error">{{ formError }}</p>
       <div class="modal-actions">

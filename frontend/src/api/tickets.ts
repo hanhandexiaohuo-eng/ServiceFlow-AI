@@ -1,4 +1,6 @@
 /** 工单 API 模块：组件不直接写 fetch，统一走这里 */
+import { request } from './request'
+
 export interface Ticket {
   id: number
   ticketNo: string
@@ -20,33 +22,14 @@ export interface PageData {
   size: number
 }
 
+/** 创建/编辑表单。creator 不在其中：创建人由后端根据登录身份确定，客户端无权指定 */
 export interface TicketForm {
   title: string
   description: string
   type: string
   priority: string
   status?: string
-  creator?: string
   assignee?: string
-}
-
-interface ApiResponse<T> {
-  code: number
-  message: string
-  data: T
-}
-
-/** 统一请求封装：非 2xx 时抛出后端返回的 message */
-async function request<T>(url: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(url, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options,
-  })
-  const body = (await response.json()) as ApiResponse<T>
-  if (!response.ok) {
-    throw new Error(body.message || `请求失败：${response.status}`)
-  }
-  return body.data
 }
 
 export function listTickets(params: {
