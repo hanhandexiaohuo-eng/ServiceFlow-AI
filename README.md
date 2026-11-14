@@ -65,6 +65,12 @@ GRANT ALL PRIVILEGES ON serviceflow.* TO 'serviceflow'@'localhost';
 FLUSH PRIVILEGES;
 ```
 
+建库后执行工单表迁移（第二阶段新增，可重复执行）：
+
+```powershell
+& "C:\Program Files\MySQL\MySQL Server 8.4\bin\mysql.exe" -u serviceflow -p serviceflow < ..\deploy\init\02-tickets.sql
+```
+
 ### 2. Java 后端（8080）
 
 先设置数据库环境变量。密码用不回显的方式输入，且只对当前 PowerShell 窗口有效：
@@ -145,8 +151,16 @@ npm run dev
 | --- | --- | --- |
 | Java | `GET /api/health` | 存活检查，返回 `service / status / version / timestamp` |
 | Java | `GET /api/health/ready` | 就绪检查，真实执行 `SELECT 1`；数据库不可用时返回 **503** 与 `checks[].status=DOWN` |
+| Java | `POST /api/tickets` | 创建工单（201），body：`title/type/creator` 必填，`priority` 默认 MEDIUM |
+| Java | `GET /api/tickets` | 分页查询，参数：`page`（默认 1）、`size`（默认 10，最大 100）、`status`、`priority`（可选筛选） |
+| Java | `GET /api/tickets/{id}` | 工单详情，不存在返回 404 |
+| Java | `PUT /api/tickets/{id}` | 全量更新工单 |
+| Java | `DELETE /api/tickets/{id}` | 删除工单 |
 | Python | `GET /health` | 存活检查 |
 | Python | `GET /health/ready` | 就绪检查（本阶段无外部依赖） |
+
+业务接口统一返回 `{code, message, data}`；校验失败 400、资源不存在 404、服务器错误 500。
+工单状态：`OPEN / IN_PROGRESS / RESOLVED / CLOSED`；优先级：`LOW / MEDIUM / HIGH / URGENT`；类型：`INCIDENT / SERVICE_REQUEST / CHANGE / CONSULT`。
 
 前端开发服务器把 `/api` 代理到 `http://127.0.0.1:8080`（见 `frontend/vite.config.ts`），因此不存在浏览器跨域问题，也不需要在后端配置 CORS。
 
