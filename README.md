@@ -68,7 +68,8 @@ FLUSH PRIVILEGES;
 建库后执行工单表迁移（第二阶段新增，可重复执行）：
 
 ```powershell
-& "C:\Program Files\MySQL\MySQL Server 8.4\bin\mysql.exe" -u serviceflow -p serviceflow < ..\deploy\init\02-tickets.sql
+# PowerShell 不支持 < 重定向，需经 cmd 执行；提示 Enter password 时输入（不回显）
+cmd /c '"C:\Program Files\MySQL\MySQL Server 8.4\bin\mysql.exe" -u serviceflow -p serviceflow < "..\deploy\init\02-tickets.sql"'
 ```
 
 ### 2. Java 后端（8080）

@@ -1,6 +1,8 @@
 package com.serviceflow.ai.common.exception;
 
 import com.serviceflow.ai.common.dto.ApiResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -17,6 +19,8 @@ import java.util.stream.Collectors;
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     /** @Valid 校验失败（如标题为空）→ 400，message 汇总所有字段错误 */
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -51,9 +55,10 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error(404, e.getMessage()));
     }
 
-    /** 兜底：未预料的异常 → 500，不向前端泄露内部细节 */
+    /** 兜底：未预料的异常 → 500，不向前端泄露内部细节，但必须在服务端日志留下完整堆栈 */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleOther(Exception e) {
+        log.error("未处理异常", e);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.error(500, "服务器内部错误"));
     }

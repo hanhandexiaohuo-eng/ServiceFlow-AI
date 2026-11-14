@@ -22,3 +22,6 @@ logging:
   level:
     root: info
     com.serviceflow.ai: info
+  file:
+    # 日志同时写入文件，便于排查问题（相对启动目录，已被 .gitignore 的 *.log 忽略）
+    name: logs/serviceflow-backend.log
