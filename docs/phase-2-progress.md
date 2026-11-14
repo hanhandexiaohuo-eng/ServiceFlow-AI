@@ -54,3 +54,22 @@
 ## 四、下一阶段（第三阶段）规划（暂不实施）
 
 DeepSeek API 接入：工单摘要、自动分类、优先级建议、处理建议。待第二阶段真实库验收通过后启动。
+
+## 五、真实数据库 CRUD 验收（2026-11-14 18:05 实测，全部通过）
+
+前提：用户本机执行 `01-init.sql`（建库）+ `02-tickets.sql`（建表，DESCRIBE 核验 12 列一致），以真实密码启动后端（ready 200 / mysql UP）。
+
+| 步骤 | 结果 |
+| --- | --- |
+| POST /api/tickets | **201**，自动生成编号 `SF20261114-MK7W`，id=1，status 默认 OPEN，created_at/updated_at 由数据库填充 |
+| GET /api/tickets?page=1&size=5 | **200**，total=1 |
+| GET /api/tickets/1 | **200**，字段完整 |
+| PUT /api/tickets/1 | **200**，status→IN_PROGRESS、assignee→agent-01 生效 |
+| GET ?status=IN_PROGRESS&priority=HIGH | **200**，total=1（组合筛选生效） |
+| DELETE /api/tickets/1 | 记录删除成功（PowerShell 非交互模式导致 cmdlet 显示异常，但请求已执行） |
+| 删除后 GET /api/tickets/1 | **404** |
+| 删除后 GET 列表 | total=0 |
+
+**过程中的两个教训（已修复/已记录）**：
+1. 曾误判"创建 500 = 数据库问题"，实际是我用 bash 风格的 `\"` 转义发 JSON，PowerShell 不解析该转义导致 Jackson 解析失败。PowerShell 下应使用 `Invoke-RestMethod` + 哈希表 `ConvertTo-Json`。
+2. 500 发生时服务端无日志（审计 P1-3），已在 `GlobalExceptionHandler.handleOther` 补 `log.error` 堆栈输出，并配置 `logging.file.name=logs/serviceflow-backend.log`（提交 52ab6fd）。

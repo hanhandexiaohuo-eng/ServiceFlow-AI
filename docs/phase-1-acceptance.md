@@ -40,7 +40,7 @@
 | 3 | 自动化测试通过 | **通过** | `Tests run: 2, Failures: 0, Errors: 0, Skipped: 0`（HealthControllerTest） |
 | 4 | `GET /api/health` | **通过** | HTTP 200，`{"service":"serviceflow-ai-backend-java","status":"UP","version":"0.1.0"}`（SERVER_PORT=8081 实测） |
 | 5 | `GET /api/health/ready` 数据库不可用态 | **通过** | 未设置 `MYSQL_PASSWORD` 时 HTTP 503，`status=DOWN`，message 为真实 `Access denied for user 'serviceflow'@'localhost' (using password: NO)`，未谎报成功 |
-| 6 | `GET /api/health/ready` 数据库正常态 | **未验证** | 助手执行环境无数据库密码，且与用户本机 PowerShell 进程空间独立，无法继承其环境变量；需用户按第四节命令启动后实测 |
+| 6 | `GET /api/health/ready` 数据库正常态 | **通过（2026-11-14 18:05 实测）** | 用户本机带密码启动后，HTTP 200，`status=UP`，`checks[0].name=mysql`、`status=UP`（真实 `SELECT 1` 通过） |
 | 7 | Python 服务 | **通过** | `/health` 与 `/health/ready` 均 HTTP 200、`status=UP` |
 | 8 | 前端页面与代理 | **通过** | `http://127.0.0.1:5173/` HTTP 200；验证时代理临时指向 8081，`/api/health` 经代理 HTTP 200（验证后已恢复为 8080） |
 | 9 | 浏览器端到端 | **通过** | 浏览器子代理实测：页面标题与三张服务卡片渲染正常，点击“检查后端连接”显示成功面板（service=serviceflow-ai-backend-java、status=UP、version=0.1.0），无错误面板 |
@@ -77,9 +77,8 @@ $env:MYSQL_DATABASE = "serviceflow"; $env:MYSQL_USER = "serviceflow"
 
 ## 五、尚未解决 / 未验证项
 
-1. **`/api/health/ready` 成功态（HTTP 200 + mysql UP）未验证** —— 唯一阻塞项。助手无法获取真实密码（对话中未出现、进程空间隔离），需用户在本机 PowerShell 执行下方命令后补验。
+1. ~~`/api/health/ready` 成功态~~ **已于 2026-11-14 18:05 验证通过**：用户在本机 PowerShell 用 `Read-Host -AsSecureString` 设置密码（长度自检 >0）后启动，ready 返回 HTTP 200 且 mysql UP。同时发现早期失败原因之一是 `Read-Host` 提示被直接回车跳过导致空密码（using password: NO）。**第一阶段验收全部通过。**
 2. Docker Compose 未实测（本机无 Docker）。
-3. 第一阶段验收条件中“MySQL 实际连接成功”未达成前，**第一阶段不算全部完成，不进入第二阶段工单 CRUD**。
 
 ## 六、用户需执行的最终验收命令（可复制）
 
