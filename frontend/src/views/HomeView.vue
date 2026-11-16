@@ -1,15 +1,18 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { checkBackendHealth, type HealthResponse } from '../api/health'
+import { getCurrentUser } from '../api/request'
 
 const loading = ref(false)
 const result = ref<HealthResponse | null>(null)
 const errorMessage = ref('')
 
+const currentUser = computed(() => getCurrentUser())
+
 const services = [
-  { name: 'Vue 3 前端', port: 5173, desc: '当前页面' },
-  { name: 'Java 后端', port: 8080, desc: 'Spring Boot 业务入口' },
-  { name: 'Python AI 服务', port: 8000, desc: 'FastAPI 能力服务' },
+  { name: 'Vue 3 前端', port: 5173, desc: '当前页面，承载交互与展示', icon: 'FE' },
+  { name: 'Java 后端', port: 8080, desc: 'Spring Boot 业务入口', icon: 'BE' },
+  { name: 'Python AI 服务', port: 8000, desc: 'FastAPI 能力服务', icon: 'AI' },
 ]
 
 async function onCheck() {
@@ -27,13 +30,19 @@ async function onCheck() {
 </script>
 
 <template>
-  <p class="intro">
-    通过 AI 对工单做分类、信息提取与处理建议生成，帮助服务团队更快定位问题、分派任务并闭环处理。
-  </p>
+  <section class="hero">
+    <h2>{{ currentUser ? `${currentUser.name}，欢迎回来` : '欢迎使用 ServiceFlow AI' }}</h2>
+    <p class="intro">
+      通过 AI 对工单做分类、信息提取与处理建议生成，帮助服务团队更快定位问题、分派任务并闭环处理。
+    </p>
+  </section>
 
   <section class="cards">
     <div v-for="s in services" :key="s.port" class="card">
-      <h3>{{ s.name }}</h3>
+      <div class="card-head">
+        <span class="icon">{{ s.icon }}</span>
+        <h3>{{ s.name }}</h3>
+      </div>
       <p class="port">端口 {{ s.port }}</p>
       <p class="desc">{{ s.desc }}</p>
     </div>
@@ -65,53 +74,91 @@ async function onCheck() {
 </template>
 
 <style scoped>
-.intro {
-  margin-top: 12px;
-  color: #7a8a99;
-  line-height: 1.6;
+.hero {
+  padding: 12px 0 4px;
 }
+.hero h2 {
+  font-size: 24px;
+}
+.intro {
+  margin-top: 8px;
+  color: var(--text-sub);
+  line-height: 1.7;
+  max-width: 640px;
+}
+
 .cards {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 16px;
-  margin: 32px 0;
+  margin: 28px 0;
 }
 .card {
-  background: #fff;
-  border: 1px solid #e4e9ef;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  padding: 18px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+.card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.icon {
+  width: 34px;
+  height: 34px;
   border-radius: 8px;
-  padding: 16px;
+  background: var(--primary-light);
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .card h3 {
   font-size: 15px;
 }
 .port {
-  color: #3b82f6;
+  color: var(--primary);
   font-weight: 600;
-  margin-top: 6px;
+  font-size: 13px;
+  margin-top: 12px;
 }
 .desc {
-  color: #7a8a99;
+  color: var(--text-muted);
   font-size: 13px;
   margin-top: 4px;
 }
+
 .check button {
-  background: #3b82f6;
+  background: var(--primary);
   color: #fff;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   padding: 10px 24px;
   font-size: 15px;
   cursor: pointer;
+  transition: background 0.15s ease;
+}
+.check button:hover:not(:disabled) {
+  background: var(--primary-hover);
 }
 .check button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
+
 .panel {
   margin-top: 20px;
-  border-radius: 8px;
-  padding: 16px;
+  border-radius: var(--radius);
+  padding: 18px;
 }
 .panel.success {
   background: #ecfdf5;
@@ -131,7 +178,7 @@ async function onCheck() {
 }
 .panel dt {
   width: 64px;
-  color: #5a6b7d;
+  color: var(--text-sub);
 }
 .panel dd {
   font-family: Consolas, monospace;
@@ -139,7 +186,7 @@ async function onCheck() {
 }
 .hint {
   margin-top: 8px;
-  color: #7a8a99;
+  color: var(--text-sub);
   font-size: 13px;
 }
 </style>

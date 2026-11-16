@@ -1,3 +1,20 @@
+:root {
+  --primary: #4f46e5;
+  --primary-hover: #4338ca;
+  --primary-light: #eef2ff;
+  --text-main: #1e293b;
+  --text-sub: #64748b;
+  --text-muted: #94a3b8;
+  --border: #e2e8f0;
+  --bg-page: #f1f5f9;
+  --bg-card: #ffffff;
+  --danger: #dc2626;
+  --radius: 10px;
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.12);
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -6,13 +23,14 @@
 
 body {
   font-family: 'Segoe UI', 'Microsoft YaHei', system-ui, sans-serif;
-  background: #f5f7fa;
-  color: #2c3e50;
+  -webkit-font-smoothing: antialiased;
+  background: var(--bg-page);
+  color: var(--text-main);
   min-height: 100vh;
 }
 
 #app {
-  max-width: 880px;
+  max-width: 1080px;
   margin: 0 auto;
-  padding: 48px 24px;
+  padding: 0 24px 48px;
 }
