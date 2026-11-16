@@ -5,6 +5,36 @@ export interface HealthResponse {
   timestamp: string
 }
 
+export interface ComponentCheck {
+  name: string
+  status: string
+  message: string
+}
+
+export interface ReadinessResponse {
+  service: string
+  status: string
+  version: string
+  timestamp: string
+  checks: ComponentCheck[]
+}
+
+/** 就绪检查：后端会附带 MySQL 等依赖组件状态（失败时返回 503，但仍带 JSON 体） */
+export async function checkReadiness(): Promise<ReadinessResponse> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 5000)
+  try {
+    const response = await fetch('/api/health/ready', { signal: controller.signal })
+    const data = (await response.json()) as ReadinessResponse
+    if (!data || !Array.isArray(data.checks)) {
+      throw new Error('就绪检查响应格式不符合预期')
+    }
+    return data
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 export async function checkBackendHealth(): Promise<HealthResponse> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), 5000)
