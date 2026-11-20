@@ -4,7 +4,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 /**
- * 更新工单请求。采用全量更新（PUT 语义）：客户端提交完整字段。
+ * 编辑工单内容。状态与处理人只能通过工作流接口变更：
+ * 这里保留字段仅用于识别旧调用并返回 400，避免客户端静默写入无效值。
  */
 public record TicketUpdateRequest(
         @NotBlank(message = "标题不能为空")
@@ -19,7 +20,6 @@ public record TicketUpdateRequest(
         @NotBlank(message = "优先级不能为空")
         String priority,
 
-        @NotBlank(message = "状态不能为空")
         String status,
 
         @Size(max = 64, message = "处理人不能超过 64 字")

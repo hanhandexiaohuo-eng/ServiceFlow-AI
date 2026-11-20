@@ -1,0 +1,11 @@
+# 开发环境：本机 MySQL（deploy/docker-compose.yml 或本地实例）+ 本机 Python AI 服务
+# 公共项（端口、数据源、SLA、调度权重、AI 地址）继承自 application.yml，全部可由环境变量覆盖
+logging:
+  level:
+    root: info
+    com.serviceflow.ai: debug
+
+# 本地调试时把 AI 读超时调短，避免等待过久；需要长分析时用环境变量覆盖
+ai:
+  service:
+    read-timeout-ms: ${AI_SERVICE_READ_TIMEOUT_MS:90000}

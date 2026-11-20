@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import { reactive, ref, watch } from 'vue'
 import { createTicket, updateTicket, type Ticket, type TicketForm } from '../api/tickets'
+import { listUsers, type UserOption } from '../api/users'
 import {
   PRIORITY_LABEL,
   PRIORITY_OPTIONS,
-  STATUS_LABEL,
-  STATUS_OPTIONS,
   TYPE_LABEL,
   TYPE_OPTIONS,
 } from '../constants/ticket'
@@ -14,18 +13,19 @@ import AppIcon from './AppIcon.vue'
 const props = defineProps<{ open: boolean; ticket: Ticket | null }>()
 const emit = defineEmits<{ (e: 'close'): void; (e: 'saved'): void }>()
 
+/** 状态与处理人不在编辑表单内：状态由工作流接口变更，处理人走分配/转交 */
 const EMPTY: TicketForm = {
   title: '',
   description: '',
   type: 'INCIDENT',
   priority: 'MEDIUM',
-  status: 'OPEN',
   assignee: '',
 }
 
 const form = reactive<TicketForm>({ ...EMPTY })
 const saving = ref(false)
 const errorMessage = ref('')
+const users = ref<UserOption[]>([])
 
 function reset(ticket: Ticket | null) {
   Object.assign(form, {
@@ -33,16 +33,23 @@ function reset(ticket: Ticket | null) {
     description: ticket?.description ?? '',
     type: ticket?.type ?? 'INCIDENT',
     priority: ticket?.priority ?? 'MEDIUM',
-    status: ticket?.status ?? 'OPEN',
-    assignee: ticket?.assignee ?? '',
+    assignee: '',
   })
   errorMessage.value = ''
 }
 
 watch(
   () => props.open,
-  (open) => {
-    if (open) reset(props.ticket)
+  async (open) => {
+    if (!open) return
+    reset(props.ticket)
+    if (!props.ticket) {
+      try {
+        users.value = await listUsers()
+      } catch {
+        users.value = []
+      }
+    }
   },
   { immediate: true }
 )
@@ -56,6 +63,7 @@ async function save() {
   errorMessage.value = ''
   try {
     if (props.ticket) {
+      // 编辑只提交内容字段
       await updateTicket(props.ticket.id, { ...form, title: form.title.trim() })
     } else {
       await createTicket({ ...form, title: form.title.trim() })
@@ -76,9 +84,13 @@ async function save() {
       <header class="head">
         <div>
           <h3>{{ ticket ? '编辑工单' : '新建工单' }}</h3>
-          <p class="sub">{{ ticket ? ticket.ticketNo : '填写工单基本信息，提交后进入待处理队列' }}</p>
+          <p class="sub">
+            {{ ticket ? ticket.ticketNo : '填写工单基本信息，创建后进入待分配队列' }}
+          </p>
         </div>
-        <button class="close" title="关闭" @click="emit('close')"><AppIcon name="close" :size="16" /></button>
+        <button class="close" title="关闭" @click="emit('close')">
+          <AppIcon name="close" :size="16" />
+        </button>
       </header>
 
       <div class="body">
@@ -107,18 +119,19 @@ async function save() {
           </label>
         </div>
 
-        <div class="row">
-          <label v-if="ticket" class="field">
-            <span>状态</span>
-            <select v-model="form.status">
-              <option v-for="s in STATUS_OPTIONS" :key="s" :value="s">{{ STATUS_LABEL[s] }}</option>
-            </select>
-          </label>
-          <label class="field">
-            <span>处理人</span>
-            <input v-model="form.assignee" maxlength="64" placeholder="选填，填写处理人姓名" />
-          </label>
-        </div>
+        <label v-if="!ticket" class="field">
+          <span>处理人（选填）</span>
+          <select v-model="form.assignee">
+            <option value="">暂不分配，进入待分配</option>
+            <option v-for="u in users" :key="u.id" :value="u.name">
+              {{ u.name }}（{{ u.username }}）
+            </option>
+          </select>
+        </label>
+
+        <p v-else class="hint">
+          状态与处理人已由工作流托管：请在详情页使用接单、开始处理、解决、关闭、转交等操作。
+        </p>
 
         <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
       </div>
@@ -209,6 +222,15 @@ async function save() {
 .row .field {
   flex: 1;
   min-width: 0;
+}
+.hint {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #e0e7ff;
+  background: #f5f7ff;
+  font-size: 12px;
+  color: #4338ca;
+  line-height: 1.7;
 }
 .error {
   font-size: 12px;

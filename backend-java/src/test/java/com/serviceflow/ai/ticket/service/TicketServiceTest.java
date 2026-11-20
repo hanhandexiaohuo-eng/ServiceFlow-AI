@@ -3,14 +3,20 @@ package com.serviceflow.ai.ticket.service;
 import com.serviceflow.ai.auth.context.LoginUser;
 import com.serviceflow.ai.auth.context.UserContext;
 import com.serviceflow.ai.auth.enums.UserRole;
+import com.serviceflow.ai.auth.service.UserQueryService;
 import com.serviceflow.ai.common.exception.ForbiddenException;
 import com.serviceflow.ai.ticket.dto.TicketCreateRequest;
 import com.serviceflow.ai.ticket.dto.TicketResponse;
+import com.serviceflow.ai.ticket.dto.TicketUpdateRequest;
+import com.serviceflow.ai.ticket.entity.Ticket;
+import com.serviceflow.ai.ticket.repository.TicketEventRepository;
 import com.serviceflow.ai.ticket.repository.TicketRepository;
+import com.serviceflow.ai.ticket.workflow.TicketWorkflowEngine;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import com.serviceflow.ai.ticket.entity.Ticket;
+
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -22,12 +28,16 @@ import static org.mockito.Mockito.when;
 
 /**
  * 工单业务测试（纯单元，mock Repository）：
- * 重点验证模块 1 的两个集成点——creator 来自登录上下文、删除仅管理员。
+ * 覆盖创建人来源、初始状态、删除权限、旧 PUT 状态入口拒绝。
  */
 class TicketServiceTest {
 
     private final TicketRepository ticketRepository = mock(TicketRepository.class);
-    private final TicketService ticketService = new TicketService(ticketRepository);
+    private final TicketEventRepository eventRepository = mock(TicketEventRepository.class);
+    private final UserQueryService userQueryService = mock(UserQueryService.class);
+    private final TicketService ticketService = new TicketService(
+            ticketRepository, eventRepository, new TicketSlaService(),
+            new TicketWorkflowEngine(), userQueryService);
 
     @AfterEach
     void tearDown() {
@@ -46,12 +56,32 @@ class TicketServiceTest {
         TicketResponse resp = ticketService.create(
                 new TicketCreateRequest("打印机故障", "描述", "INCIDENT", null, null));
 
-        // 创建人来自登录上下文显示名，不是请求参数
         assertEquals("张三", resp.creator());
         ArgumentCaptor<Ticket> captor = ArgumentCaptor.forClass(Ticket.class);
         verify(ticketRepository).insert(captor.capture());
         assertEquals("张三", captor.getValue().getCreator());
-        assertEquals("OPEN", captor.getValue().getStatus());
+        // 未指定处理人 → PENDING；SLA 截止时间由后端计算
+        assertEquals("PENDING", captor.getValue().getStatus());
+        assertEquals(24, resp.sla().hours());
+        verify(eventRepository).insert(any());
+    }
+
+    @Test
+    void updateRejectsStatusChange() {
+        loginAs("张三", UserRole.USER);
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> ticketService.update(1L, new TicketUpdateRequest(
+                        "标题", "描述", "INCIDENT", "HIGH", "PROCESSING", null)));
+        assertEquals("状态变更请使用工作流接口（接单/开始处理/解决/关闭/取消）", e.getMessage());
+    }
+
+    @Test
+    void updateRejectsAssigneeChange() {
+        loginAs("张三", UserRole.USER);
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> ticketService.update(1L, new TicketUpdateRequest(
+                        "标题", "描述", "INCIDENT", "HIGH", null, "李四")));
+        assertEquals("处理人变更请使用分配或转交接口", e.getMessage());
     }
 
     @Test
@@ -61,17 +91,18 @@ class TicketServiceTest {
         ForbiddenException e = assertThrows(ForbiddenException.class,
                 () -> ticketService.delete(1L));
         assertEquals("仅管理员可删除工单", e.getMessage());
-        // 权限不足时不能执行到删除 SQL
         verify(ticketRepository, never()).deleteById(any());
     }
 
     @Test
     void deleteAsAdminSucceeds() {
         loginAs("系统管理员", UserRole.ADMIN);
+        when(ticketRepository.findById(1L)).thenReturn(Optional.of(new Ticket()));
         when(ticketRepository.deleteById(1L)).thenReturn(1);
 
         ticketService.delete(1L);
 
+        verify(eventRepository).deleteByTicketId(1L);
         verify(ticketRepository).deleteById(1L);
     }
 

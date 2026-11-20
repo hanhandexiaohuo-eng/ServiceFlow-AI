@@ -1,7 +1,6 @@
 package com.serviceflow.ai.health.controller;
 
 import com.serviceflow.ai.health.dto.ComponentCheck;
-import com.serviceflow.ai.health.dto.HealthResponse;
 import com.serviceflow.ai.health.dto.ReadinessResponse;
 import com.serviceflow.ai.health.service.HealthService;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,14 +29,13 @@ class HealthControllerTest {
     }
 
     @Test
-    void healthReturnsUp() throws Exception {
-        when(healthService.health()).thenReturn(
-                new HealthResponse(HealthService.SERVICE_NAME, "UP", HealthService.VERSION, Instant.now()));
-
+    void healthReturnsMinimalStatusOnly() throws Exception {
         mockMvc.perform(get("/api/health"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.service").value(HealthService.SERVICE_NAME))
-                .andExpect(jsonPath("$.status").value("UP"));
+                .andExpect(jsonPath("$.status").value("UP"))
+                // 公网健康响应只暴露最小状态，不泄露服务名与版本
+                .andExpect(jsonPath("$.service").doesNotExist())
+                .andExpect(jsonPath("$.version").doesNotExist());
     }
 
     @Test

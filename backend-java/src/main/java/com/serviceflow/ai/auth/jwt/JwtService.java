@@ -39,18 +39,26 @@ public class JwtService {
         this.ttl = Duration.ofMinutes(expireMinutes);
     }
 
-    /** 签发令牌：sub=userId，附带 username/name/role，2 小时过期。payload 不放任何敏感信息。 */
+    /** 签发令牌：sub=userId，附带 username/name/role/ver，默认 2 小时过期。payload 不放任何敏感信息。 */
     public String issueToken(User user) {
         Instant now = Instant.now();
+        int version = user.getTokenVersion() == null ? 0 : user.getTokenVersion();
         return Jwts.builder()
                 .subject(String.valueOf(user.getId()))
                 .claim("username", user.getUsername())
                 .claim("name", user.getName())
                 .claim("role", user.getRole())
+                // 会话版本：改密/退出/强制下线后 +1，使旧 Token 立即失效
+                .claim("ver", version)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plus(ttl)))
                 .signWith(key)
                 .compact();
+    }
+
+    /** 会话有效期（秒），用于 Cookie Max-Age 与 JWT 过期时间保持一致 */
+    public long ttlSeconds() {
+        return ttl.getSeconds();
     }
 
     /**

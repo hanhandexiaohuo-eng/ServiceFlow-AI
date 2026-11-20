@@ -22,8 +22,10 @@ const mine = computed(() => {
 })
 const stats = computed(() => ({
   total: mine.value.length,
-  open: mine.value.filter((t) => t.status === 'OPEN').length,
-  running: mine.value.filter((t) => t.status === 'IN_PROGRESS').length,
+  pending: mine.value.filter((t) => t.status === 'PENDING').length,
+  running: mine.value.filter(
+    (t) => t.status === 'ASSIGNED' || t.status === 'ACCEPTED' || t.status === 'PROCESSING'
+  ).length,
   done: mine.value.filter((t) => t.status === 'RESOLVED' || t.status === 'CLOSED').length,
 }))
 
@@ -52,11 +54,11 @@ onMounted(() => refreshTickets())
         <span class="value num">{{ stats.total }}</span>
       </div>
       <div class="stat">
-        <span class="label">待处理</span>
-        <span class="value num">{{ stats.open }}</span>
+        <span class="label">待分配</span>
+        <span class="value num">{{ stats.pending }}</span>
       </div>
       <div class="stat">
-        <span class="label">处理中</span>
+        <span class="label">进行中</span>
         <span class="value num">{{ stats.running }}</span>
       </div>
       <div class="stat">

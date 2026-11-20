@@ -2,6 +2,9 @@
 .env
 .env.*
 !.env.example
+# 前端构建期环境文件只含非敏感配置，需要纳入版本管理
+!frontend/.env.development
+!frontend/.env.production
 
 # Node / 前端
 node_modules/
@@ -26,4 +29,9 @@ __pycache__/
 
 # 日志与本地工具
 *.log
+*.log.*
+backend-java/logs/
 .tools/
+
+# Trae IDE 本地配置（spec、规则等，不随仓库分发）
+.trae/

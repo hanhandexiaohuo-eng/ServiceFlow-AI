@@ -1,0 +1,168 @@
+# ServiceFlow AI 一键部署编排（MySQL + Python AI + Java 后端 + nginx 前端）
+# 用法：
+#   1. cp deploy/.env.example .env 并填写真实值（.env 不被提交）
+#   2. docker compose --env-file .env up -d --build
+#   3. 浏览器访问 http://127.0.0.1:${FRONTEND_PORT:-8085}
+name: serviceflow-ai
+
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: serviceflow-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?请在 .env 中设置 MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-serviceflow}
+      MYSQL_USER: ${MYSQL_USER:-serviceflow}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?请在 .env 中设置 MYSQL_PASSWORD}
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      # 数据持久化：容器重建/重启不丢业务数据
+      - mysql-data:/var/lib/mysql
+      # 首次初始化（空数据卷时）自动执行：phase1-4 建表与种子
+      - ./deploy/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    networks:
+      - serviceflow
+
+  # 一次性迁移任务：对已有数据卷补齐 phase5/phase6 结构（脚本可重复执行）
+  # 新库已由 init 覆盖 phase1-4，因此这里只执行 phase5、phase6，避免重复插入 phase4 种子
+  migrate:
+    image: mysql:8.4
+    container_name: serviceflow-migrate
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-serviceflow}
+      MYSQL_USER: ${MYSQL_USER:-serviceflow}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?请在 .env 中设置 MYSQL_PASSWORD}
+    volumes:
+      - ./deploy/migrations:/migrations:ro
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        set -e
+        mysql -h mysql -u"$$MYSQL_USER" -p"$$MYSQL_PASSWORD" "$$MYSQL_DATABASE" < /migrations/20261116-phase5-ai-knowledge.sql
+        mysql -h mysql -u"$$MYSQL_USER" -p"$$MYSQL_PASSWORD" "$$MYSQL_DATABASE" < /migrations/20261116-phase6-analytics-indexes.sql
+        mysql -h mysql -u"$$MYSQL_USER" -p"$$MYSQL_PASSWORD" "$$MYSQL_DATABASE" < /migrations/20261118-security-hardening.sql
+        mysql -h mysql -u"$$MYSQL_USER" -p"$$MYSQL_PASSWORD" "$$MYSQL_DATABASE" < /migrations/20261119-user-admin.sql
+        mysql -h mysql -u"$$MYSQL_USER" -p"$$MYSQL_PASSWORD" "$$MYSQL_DATABASE" < /migrations/20261120-ai-governance.sql
+        echo "migrations applied"
+    restart: "no"
+    networks:
+      - serviceflow
+
+  ai:
+    build:
+      context: ./ai-python
+    container_name: serviceflow-ai-python
+    restart: unless-stopped
+    environment:
+      # 模型密钥只注入 Python 容器，不进入 Java、前端或镜像层
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
+      DEEPSEEK_TIMEOUT_SECONDS: ${DEEPSEEK_TIMEOUT_SECONDS:-60}
+      AI_RATE_LIMIT_PER_MINUTE: ${AI_RATE_LIMIT_PER_MINUTE:-12}
+      # 治理路由启用后，供应商密钥由 Java 在请求内下发，进程内允许没有 DEEPSEEK_API_KEY
+      AI_ALLOW_PROVIDER_OVERRIDE: ${AI_ALLOW_PROVIDER_OVERRIDE:-true}
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3).status == 200 else 1)
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - serviceflow
+
+  backend:
+    build:
+      context: ./backend-java
+      args:
+        MAVEN_MIRROR: ${MAVEN_MIRROR:-}
+    container_name: serviceflow-backend
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      SERVER_PORT: 8080
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-serviceflow}
+      MYSQL_USER: ${MYSQL_USER:-serviceflow}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?请在 .env 中设置 MYSQL_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET:?请在 .env 中设置 JWT_SECRET}
+      JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-120}
+      ADMIN_INITIAL_PASSWORD: ${ADMIN_INITIAL_PASSWORD:-}
+      # HTTPS 环境设为 true（Cookie 仅经 TLS 传输）；纯 HTTP 过渡期必须显式设为 false
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      AI_SERVICE_BASE_URL: http://ai:8000
+      AI_SERVICE_CONNECT_TIMEOUT_MS: ${AI_SERVICE_CONNECT_TIMEOUT_MS:-3000}
+      AI_SERVICE_READ_TIMEOUT_MS: ${AI_SERVICE_READ_TIMEOUT_MS:-90000}
+      # 供应商密钥加密主密钥（base64 编码 32 字节）；未配置时仅能使用环境变量中的既有模型配置
+      AI_SECRET_KEY: ${AI_SECRET_KEY:-}
+      # 超级管理员白名单（逗号分隔），留空表示所有 ADMIN 均可管理供应商与密钥
+      SUPER_ADMIN_USERNAMES: ${SUPER_ADMIN_USERNAMES:-}
+      # 前后端同源（nginx 反代），默认不开放跨域；需要时再填白名单
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
+      JAVA_OPTS: ${JAVA_OPTS:--XX:MaxRAMPercentage=75}
+    volumes:
+      - backend-logs:/app/logs
+    depends_on:
+      mysql:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      ai:
+        condition: service_healthy
+    healthcheck:
+      # ready 会用真实 SQL 检查数据库连接，避免 only depends_on 的假可用
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/api/health/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    networks:
+      - serviceflow
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org}
+    container_name: serviceflow-frontend
+    restart: unless-stopped
+    ports:
+      # 默认只绑本机；云服务器部署时设 FRONTEND_BIND=0.0.0.0，并通过安全组限制来源
+      - "${FRONTEND_BIND:-127.0.0.1}:${FRONTEND_PORT:-8085}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - serviceflow
+
+volumes:
+  mysql-data:
+  backend-logs:
+
+networks:
+  serviceflow:
+    driver: bridge

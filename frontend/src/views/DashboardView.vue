@@ -20,6 +20,7 @@ import {
   inProgressCount,
   isLoading,
   loadError,
+  overdueCount,
   priorityDistribution,
   recentTickets,
   refreshTickets,
@@ -28,6 +29,7 @@ import {
   totalCount,
   typeDistribution,
   unassignedCount,
+  warningCount,
 } from '../composables/useTicketStore'
 import type { TableColumn } from '../types/ui'
 
@@ -324,11 +326,11 @@ onBeforeUnmount(() => {
       <StatCard label="已完成" :value="doneCount" icon="check" tone="emerald" desc="已解决 + 已关闭" :loading="isLoading" />
       <StatCard
         label="超时工单"
-        :value="0"
+        :value="overdueCount"
         icon="alert"
         tone="rose"
-        desc="需 SLA 策略与时限字段（待接入）"
-        pending
+        desc="SLA 已超时且未结束"
+        :loading="isLoading"
       />
     </section>
 
@@ -337,7 +339,7 @@ onBeforeUnmount(() => {
       <ChartCard
         title="工单趋势分析"
         subtitle="按天聚合新增、已完成与处理中工单"
-        hint="新增按创建时间统计；已完成/处理中按当前状态与更新时间近似统计，精确趋势需后端提供状态流转记录接口（待接入）。"
+        hint="新增按创建时间统计；已完成优先按解决/关闭时间统计；处理中按当前状态与创建日期统计。"
         :loading="isLoading"
       >
         <template #actions>
@@ -373,7 +375,7 @@ onBeforeUnmount(() => {
           </li>
         </ul>
         <EmptyState v-else compact icon="tickets" title="暂无工单" />
-        <p class="note">「已分配 / 已接单」状态需后端扩展状态机（待接入）。</p>
+        <p class="note">状态由后端工作流引擎维护，共 7 种状态；SLA 由服务端实时计算。</p>
       </ChartCard>
     </section>
 
@@ -432,10 +434,9 @@ onBeforeUnmount(() => {
             <span class="todo-num num">{{ todos.assignedToMe.length }}</span>
             <span class="todo-name">待接单</span>
           </div>
-          <div class="todo-stat pending">
-            <span class="todo-num">—</span>
+          <div class="todo-stat">
+            <span class="todo-num num">{{ warningCount }}</span>
             <span class="todo-name">临近 SLA</span>
-            <em>待接入</em>
           </div>
         </div>
 

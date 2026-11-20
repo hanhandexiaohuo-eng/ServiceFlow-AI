@@ -11,4 +11,6 @@ export interface TableColumn {
   width?: string
   align?: 'left' | 'right' | 'center'
   nowrap?: boolean
+  /** 是否可点击表头排序（需配合 DataTable 的 sort 事件） */
+  sortable?: boolean
 }

@@ -1,9 +1,25 @@
 server:
   port: ${SERVER_PORT:8080}
+  # 不暴露容器/框架版本；错误响应不回传异常细节
+  server-header: ""
+  error:
+    include-message: never
+    include-stacktrace: never
+
+security:
+  cookie:
+    # HTTPS 部署必须为 true；HTTP 过渡期由 COOKIE_SECURE=false 显式降级（见部署文档）
+    secure: ${COOKIE_SECURE:true}
+  # 超级管理员白名单（用户名，逗号分隔）：只有这些人能改 AI 供应商与密钥；
+  # 留空表示所有 ADMIN 均视为超级管理员（当前角色模型下的默认行为）
+  super-admin-usernames: ${SUPER_ADMIN_USERNAMES:}
 
 spring:
   application:
     name: serviceflow-ai-backend-java
+  profiles:
+    # 默认 dev，容器/生产通过 SPRING_PROFILES_ACTIVE 覆盖为 prod
+    active: ${SPRING_PROFILES_ACTIVE:dev}
   datasource:
     # 凭据全部来自环境变量，源码中不出现真实密码
     url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:serviceflow}?useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&connectTimeout=3000&socketTimeout=5000
@@ -19,9 +35,70 @@ spring:
       initialization-fail-timeout: -1
 
 logging:
+  # 统一格式：时间 级别 [requestId] [user] logger - 消息
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%X{requestId:-}] [%X{user:-}] %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%X{requestId:-}] [%X{user:-}] %logger{36} - %msg%n"
   level:
     root: info
     com.serviceflow.ai: info
   file:
-    # 日志同时写入文件，便于排查问题（相对启动目录，已被 .gitignore 的 *.log 忽略）
+    # 日志同时写入文件，便于排查问题（相对启动目录，已被 .gitignore 忽略）
     name: logs/serviceflow-backend.log
+
+# 跨域：默认不开放（开发走 Vite 代理、生产走 nginx 同源反代）。
+# 仅当前后端分域部署时，用 CORS_ALLOWED_ORIGINS 显式列出来源，例如 https://sf.example.com
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:}
+
+# 接口文档：默认开启；生产如需关闭，设置 SPRINGDOC_ENABLED=false / SPRINGDOC_UI_ENABLED=false
+springdoc:
+  api-docs:
+    enabled: ${SPRINGDOC_ENABLED:true}
+  swagger-ui:
+    enabled: ${SPRINGDOC_UI_ENABLED:true}
+
+# 慢 SQL 观测：JdbcTemplate 单次调用超过该耗时输出一条告警（只记 SQL，不记参数）
+slow-sql:
+  threshold-ms: ${SLOW_SQL_THRESHOLD_MS:500}
+
+# SLA 策略：时限与预警阈值外置，默认值与原硬编码口径一致（4/8/24/72 小时、120 分钟）
+sla:
+  warning-minutes: ${SLA_WARNING_MINUTES:120}
+  policy:
+    urgent-hours: ${SLA_URGENT_HOURS:4}
+    high-hours: ${SLA_HIGH_HOURS:8}
+    medium-hours: ${SLA_MEDIUM_HOURS:24}
+    low-hours: ${SLA_LOW_HOURS:72}
+
+# 调度权重与阈值：所有分数 0-100，权重之和不为 1 时按比例归一化
+dispatch:
+  weights:
+    skill: 0.40
+    workload: 0.30
+    sla: 0.20
+    performance: 0.10
+  load:
+    low-max: 49
+    normal-max: 79
+    high-max: 99
+  performance:
+    sample-threshold: 5
+    neutral-score: 60
+    full-volume: 10
+  top-limit: 5
+
+# AI 服务（Python FastAPI）调用参数：Java 不持有任何模型密钥
+ai:
+  service:
+    base-url: ${AI_SERVICE_BASE_URL:http://127.0.0.1:8000}
+    connect-timeout-ms: ${AI_SERVICE_CONNECT_TIMEOUT_MS:3000}
+    read-timeout-ms: ${AI_SERVICE_READ_TIMEOUT_MS:90000}
+    enabled: ${AI_SERVICE_ENABLED:true}
+    dedupe-seconds: ${AI_DEDUPE_SECONDS:60}
+    user-rate-limit-per-minute: ${AI_USER_RATE_LIMIT_PER_MINUTE:10}
+  governance:
+    # 供应商密钥加密主密钥（base64 编码的 32 字节），只从部署环境变量注入；
+    # 未配置时禁用密钥写入与治理路由，AI 调用继续使用 Python 环境变量配置
+    secret-key: ${AI_SECRET_KEY:}
+

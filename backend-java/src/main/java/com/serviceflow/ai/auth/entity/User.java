@@ -16,6 +16,15 @@ public class User {
     private Integer status;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    /** 1=首次登录必须修改密码 */
+    private Integer passwordChangeRequired;
+    /** 会话版本：+1 后旧 Token 全部失效（改密、退出、管理员强制下线） */
+    private Integer tokenVersion;
+    private Integer failedLoginCount;
+    private LocalDateTime lockedUntil;
+    private LocalDateTime lastLoginAt;
+    /** 部门 / 团队归属，可为空 */
+    private String department;
 
     public Long getId() {
         return id;
@@ -79,6 +88,54 @@ public class User {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public Integer getPasswordChangeRequired() {
+        return passwordChangeRequired;
+    }
+
+    public void setPasswordChangeRequired(Integer passwordChangeRequired) {
+        this.passwordChangeRequired = passwordChangeRequired;
+    }
+
+    public Integer getTokenVersion() {
+        return tokenVersion;
+    }
+
+    public void setTokenVersion(Integer tokenVersion) {
+        this.tokenVersion = tokenVersion;
+    }
+
+    public Integer getFailedLoginCount() {
+        return failedLoginCount;
+    }
+
+    public void setFailedLoginCount(Integer failedLoginCount) {
+        this.failedLoginCount = failedLoginCount;
+    }
+
+    public LocalDateTime getLockedUntil() {
+        return lockedUntil;
+    }
+
+    public void setLockedUntil(LocalDateTime lockedUntil) {
+        this.lockedUntil = lockedUntil;
+    }
+
+    public LocalDateTime getLastLoginAt() {
+        return lastLoginAt;
+    }
+
+    public void setLastLoginAt(LocalDateTime lastLoginAt) {
+        this.lastLoginAt = lastLoginAt;
+    }
+
+    public String getDepartment() {
+        return department;
+    }
+
+    public void setDepartment(String department) {
+        this.department = department;
     }
 
     /** 刻意不含 password：任何日志打印实体都不会泄露哈希 */

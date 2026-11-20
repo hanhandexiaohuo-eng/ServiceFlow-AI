@@ -23,7 +23,11 @@ async function onSubmit() {
   submitting.value = true
   errorMessage.value = ''
   try {
-    await login(form.username.trim(), form.password)
+    const result = await login(form.username.trim(), form.password)
+    if (result.passwordChangeRequired) {
+      router.push('/change-password')
+      return
+    }
     const redirect = typeof router.currentRoute.value.query.redirect === 'string'
       ? router.currentRoute.value.query.redirect
       : '/'
@@ -89,7 +93,7 @@ async function onSubmit() {
         </button>
 
         <p class="support">
-          测试账号：admin / 123456（管理员） · bob / user123（普通用户）
+          账号由管理员分配；首次登录需修改初始密码后才能使用系统功能。
         </p>
       </form>
     </div>

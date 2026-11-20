@@ -1,0 +1,13 @@
+# 测试环境：CI 或本地测试库，默认关闭外部 AI 调用，避免测试依赖真实 DeepSeek 密钥与网络
+spring:
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:serviceflow_test}?useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&connectTimeout=3000&socketTimeout=5000
+
+logging:
+  level:
+    root: warn
+    com.serviceflow.ai: info
+
+ai:
+  service:
+    enabled: ${AI_SERVICE_ENABLED:false}

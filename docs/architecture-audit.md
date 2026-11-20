@@ -89,7 +89,7 @@ com.serviceflow.ai
 - **结论**：**P0，必须补**。借鉴 sky 的 JWT + 拦截器 + ThreadLocal 方案，但有针对性修正：
   1. sky 用 **MD5** 存密码（`DigestUtils.md5DigestAsHex`）——已不安全，我们改用 **BCrypt**（`spring-security-crypto`，不引入整个 Spring Security）。
   2. sky 拦截器设置了 `BaseContext.setCurrentId` 但**从不清除** ThreadLocal（线程池复用会串号）——我们在 `afterCompletion` 里 `remove()`。
-  3. sky 有硬编码默认密码 `123456`——我们不设默认密码，首用户由迁移 SQL 指定。
+  3. sky 在 SQL 里硬编码了一个弱默认密码——我们不设默认密码，首用户由部署环境变量一次性初始化。
 
 ### 6.7 事务管理
 

@@ -5,6 +5,7 @@ import AppIcon from './AppIcon.vue'
 import Breadcrumb from './Breadcrumb.vue'
 import type { CrumbItem } from '../types/ui'
 import { clearAuth, getCurrentUser } from '../api/request'
+import { logout as logoutApi } from '../api/auth'
 import { ROLE_LABEL, formatDateTime } from '../constants/ticket'
 import {
   buildMyTodos,
@@ -41,7 +42,12 @@ function goDetail(id: number) {
   router.push(`/tickets/${id}`)
 }
 
-function logout() {
+async function logout() {
+  try {
+    await logoutApi()
+  } catch {
+    // 会话可能已过期，仍需清理本地状态并回到登录页
+  }
   clearAuth()
   router.push('/login')
 }

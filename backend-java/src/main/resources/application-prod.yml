@@ -1,0 +1,11 @@
+# 生产环境：容器内运行，所有敏感配置只从环境变量注入（不存在默认密码/密钥）
+logging:
+  level:
+    root: warn
+    com.serviceflow.ai: info
+  file:
+    name: ${LOG_FILE:logs/serviceflow-backend.log}
+
+ai:
+  service:
+    enabled: ${AI_SERVICE_ENABLED:true}

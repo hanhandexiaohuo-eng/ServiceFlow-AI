@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import AppIcon from './AppIcon.vue'
-import { checkBackendHealth, checkReadiness } from '../api/health'
+import { checkBackendHealth } from '../api/health'
 
 /**
- * 服务健康状态：Java / MySQL 使用真实健康检查接口；
- * Python AI 服务前端不直连（跨域且不硬编码域名），明确标记待接入。
+ * 服务健康状态：浏览器只能看到公网最小化健康接口（UP/DOWN）。
+ * 带依赖明细的就绪检查仅对内网监控开放，因此数据库与 AI 服务在这里标记为「受限」，
+ * 不伪造、不猜测其状态。
  */
-type HealthStatus = 'loading' | 'up' | 'down' | 'pending'
+type HealthStatus = 'loading' | 'up' | 'down' | 'restricted'
 
 interface HealthItem {
   key: string
@@ -21,18 +22,24 @@ const STATUS_TEXT: Record<HealthStatus, string> = {
   loading: '检测中',
   up: '正常',
   down: '异常',
-  pending: '待接入',
+  restricted: '受限',
 }
 
 const health = ref<HealthItem[]>([
   { key: 'java', name: 'Java 后端', icon: 'server', status: 'loading', detail: '检测中…' },
-  { key: 'mysql', name: 'MySQL 数据库', icon: 'database', status: 'loading', detail: '检测中…' },
+  {
+    key: 'mysql',
+    name: 'MySQL 数据库',
+    icon: 'database',
+    status: 'restricted',
+    detail: '依赖明细仅对内网监控开放，请通过运维就绪检查查看',
+  },
   {
     key: 'python',
     name: 'Python AI 服务',
     icon: 'cpu',
-    status: 'pending',
-    detail: '前端不直连 AI 服务，需后端聚合健康检查（待接入）',
+    status: 'restricted',
+    detail: 'AI 调用由后端代理，浏览器不直连模型服务',
   },
 ])
 
@@ -42,29 +49,16 @@ const loading = ref(false)
 async function check() {
   loading.value = true
   const started = performance.now()
-  const [java, ready] = await Promise.allSettled([checkBackendHealth(), checkReadiness()])
-  const cost = Math.round(performance.now() - started)
 
   const javaItem = health.value.find((i) => i.key === 'java')
   if (javaItem) {
-    if (java.status === 'fulfilled') {
-      javaItem.status = 'up'
-      javaItem.detail = `${java.value.service} · v${java.value.version} · 响应 ${cost}ms`
-    } else {
+    try {
+      const result = await checkBackendHealth()
+      javaItem.status = result.status === 'UP' ? 'up' : 'down'
+      javaItem.detail = `状态 ${result.status} · 响应 ${Math.round(performance.now() - started)}ms`
+    } catch (error) {
       javaItem.status = 'down'
-      javaItem.detail = java.reason instanceof Error ? java.reason.message : '连接失败'
-    }
-  }
-
-  const mysqlItem = health.value.find((i) => i.key === 'mysql')
-  if (mysqlItem) {
-    if (ready.status === 'fulfilled') {
-      const checkResult = ready.value.checks.find((c) => c.name === 'mysql')
-      mysqlItem.status = checkResult?.status === 'UP' ? 'up' : 'down'
-      mysqlItem.detail = checkResult?.message ?? '后端未返回数据库检查结果'
-    } else {
-      mysqlItem.status = 'down'
-      mysqlItem.detail = ready.reason instanceof Error ? ready.reason.message : '就绪检查失败'
+      javaItem.detail = error instanceof Error ? error.message : '连接失败'
     }
   }
 
@@ -203,6 +197,10 @@ onMounted(check)
 .pill.loading {
   background: #eff6ff;
   color: #1d4ed8;
+}
+.pill.restricted {
+  background: #f8fafc;
+  color: var(--ink-3);
 }
 
 @media (max-width: 1280px) {

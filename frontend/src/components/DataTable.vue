@@ -3,7 +3,7 @@ import EmptyState from './EmptyState.vue'
 import LoadingState from './LoadingState.vue'
 import type { TableColumn } from '../types/ui'
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     columns: TableColumn[]
     rows: Record<string, any>[]
@@ -12,14 +12,39 @@ withDefaults(
     emptyText?: string
     clickable?: boolean
     dense?: boolean
+    /** 当前排序列（配合列上的 sortable 使用） */
+    sortKey?: string
+    sortDir?: 'asc' | 'desc'
+    /** 行附加 class：用于 SLA 超时等整行提示 */
+    rowClass?: (row: Record<string, any>) => string
   }>(),
-  { rowKey: 'id', loading: false, emptyText: '暂无数据', clickable: false, dense: false }
+  {
+    rowKey: 'id',
+    loading: false,
+    emptyText: '暂无数据',
+    clickable: false,
+    dense: false,
+    sortKey: '',
+    sortDir: 'desc',
+  }
 )
 
-const emit = defineEmits<{ (e: 'row-click', row: Record<string, any>): void }>()
+const emit = defineEmits<{
+  (e: 'row-click', row: Record<string, any>): void
+  (e: 'sort', key: string): void
+}>()
 
 function onClick(row: Record<string, any>) {
   emit('row-click', row)
+}
+
+function onSort(col: TableColumn) {
+  if (!col.sortable) return
+  emit('sort', col.key)
+}
+
+function classOf(row: Record<string, any>): string[] {
+  return [props.rowClass ? props.rowClass(row) : '', props.clickable ? 'clickable' : '']
 }
 </script>
 
@@ -35,8 +60,16 @@ function onClick(row: Record<string, any>) {
             v-for="col in columns"
             :key="col.key"
             :style="{ textAlign: col.align ?? 'left' }"
+            :class="{ sortable: col.sortable, sorted: col.sortable && sortKey === col.key }"
+            :title="col.sortable ? '点击排序' : undefined"
+            @click="onSort(col)"
           >
-            {{ col.label }}
+            <span class="th-inner" :style="{ justifyContent: col.align === 'right' ? 'flex-end' : col.align === 'center' ? 'center' : 'flex-start' }">
+              {{ col.label }}
+              <span v-if="col.sortable" class="sort-ind">
+                {{ sortKey === col.key ? (sortDir === 'asc' ? '↑' : '↓') : '⇅' }}
+              </span>
+            </span>
           </th>
         </tr>
       </thead>
@@ -51,7 +84,7 @@ function onClick(row: Record<string, any>) {
           v-for="row in rows"
           v-else
           :key="String(row[rowKey])"
-          :class="{ clickable }"
+          :class="classOf(row)"
           @click="clickable && onClick(row)"
         >
           <td
@@ -90,6 +123,27 @@ th {
   text-transform: uppercase;
   white-space: nowrap;
   text-align: left;
+}
+.th-inner {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+th.sortable:hover {
+  color: var(--ink-2);
+  background: #f4f6fa;
+}
+th.sorted {
+  color: var(--brand);
+}
+.sort-ind {
+  font-size: 10px;
+  line-height: 1;
+  opacity: 0.75;
 }
 td {
   padding: 11px 14px;

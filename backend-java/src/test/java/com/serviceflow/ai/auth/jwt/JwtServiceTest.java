@@ -5,6 +5,9 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import org.junit.jupiter.api.Test;
 
+import java.security.SecureRandom;
+import java.util.Base64;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -12,7 +15,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** JWT 签发与解析的纯单元测试，不依赖 Spring 容器和数据库。 */
 class JwtServiceTest {
 
-    private static final String SECRET = "0123456789abcdef0123456789abcdef"; // 正好 32 字节
+    /** 每次运行随机生成，源码与仓库中不出现任何固定密钥 */
+    private static String randomSecret() {
+        byte[] bytes = new byte[32];
+        new SecureRandom().nextBytes(bytes);
+        return Base64.getEncoder().encodeToString(bytes);
+    }
+
+    private static final String SECRET = randomSecret();
 
     private static User sampleUser() {
         User u = new User();
@@ -21,6 +31,7 @@ class JwtServiceTest {
         u.setName("系统管理员");
         u.setRole("ADMIN");
         u.setStatus(1);
+        u.setTokenVersion(2);
         return u;
     }
 
@@ -35,6 +46,8 @@ class JwtServiceTest {
         assertEquals("admin", claims.get("username"));
         assertEquals("系统管理员", claims.get("name"));
         assertEquals("ADMIN", claims.get("role"));
+        // 会话版本写入 Token，改密/退出后旧 Token 可被识别并拒绝
+        assertEquals(2, claims.get("ver", Integer.class));
         assertTrue(claims.getExpiration().getTime() > System.currentTimeMillis());
     }
 
@@ -51,10 +64,11 @@ class JwtServiceTest {
     void tamperedSignatureRejected() {
         JwtService service = new JwtService(SECRET, 120);
         String token = service.issueToken(sampleUser());
-        // 篡改签名段的最后一个字符（换成不同的 base64url 字符）
-        char last = token.charAt(token.length() - 1);
-        char replacement = last == 'a' ? 'b' : 'a';
-        String tampered = token.substring(0, token.length() - 1) + replacement;
+        // 篡改签名段的中间字符：末位字符的低位可能不参与解码，改末位有概率仍验签通过
+        int index = token.length() - 5;
+        char original = token.charAt(index);
+        char replacement = original == 'a' ? 'b' : 'a';
+        String tampered = token.substring(0, index) + replacement + token.substring(index + 1);
 
         assertThrows(JwtException.class, () -> service.parse(tampered));
     }
@@ -69,7 +83,7 @@ class JwtServiceTest {
     @Test
     void differentSecretCannotVerify() {
         JwtService issuer = new JwtService(SECRET, 120);
-        JwtService other = new JwtService("fedcba9876543210fedcba9876543210", 120);
+        JwtService other = new JwtService(randomSecret(), 120);
         String token = issuer.issueToken(sampleUser());
 
         assertThrows(JwtException.class, () -> other.parse(token));

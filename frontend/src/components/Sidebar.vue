@@ -1,11 +1,25 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import AppIcon from './AppIcon.vue'
 import { MENU_GROUPS } from '../constants/menu'
+import { isFeatureEnabled } from '../constants/features'
+import { getCurrentUser } from '../api/request'
 
 defineProps<{ collapsed: boolean }>()
 
 const route = useRoute()
+const isAdmin = getCurrentUser()?.role === 'ADMIN'
+
+/** 功能开关关闭或权限不足的菜单项不展示，避免出现「点了没反应」的伪功能 */
+const visibleGroups = computed(() =>
+  MENU_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter(
+      (item) => isFeatureEnabled(item.feature) && (!item.adminOnly || isAdmin)
+    ),
+  })).filter((group) => group.items.length > 0)
+)
 
 /** 工单详情页（/tickets/:id）也需要点亮「工单列表」 */
 function isActive(to: string): boolean {
@@ -26,7 +40,7 @@ function isActive(to: string): boolean {
     </div>
 
     <nav class="nav">
-      <div v-for="group in MENU_GROUPS" :key="group.name" class="group">
+      <div v-for="group in visibleGroups" :key="group.name" class="group">
         <p v-if="!collapsed" class="group-name">{{ group.name }}</p>
         <div v-else class="group-line" />
         <router-link

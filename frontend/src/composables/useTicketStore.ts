@@ -88,17 +88,31 @@ export const todayNewCount = computed(
   () => state.tickets.filter((t) => keyOf(t.createdAt) === todayKey()).length
 )
 
-/** 待分配：待处理且尚未指派处理人（后端无“已分配”状态，用此口径近似） */
+/** 待分配：后端 PENDING 状态 */
 export const unassignedCount = computed(
-  () => state.tickets.filter((t) => t.status === 'OPEN' && !t.assignee).length
+  () => state.tickets.filter((t) => t.status === 'PENDING').length
 )
 
+/** 处理中：已接单 + 处理中，都属于“正在推进” */
 export const inProgressCount = computed(
-  () => state.tickets.filter((t) => t.status === 'IN_PROGRESS').length
+  () => state.tickets.filter((t) => t.status === 'ACCEPTED' || t.status === 'PROCESSING').length
+)
+
+export const assignedCount = computed(
+  () => state.tickets.filter((t) => t.status === 'ASSIGNED').length
 )
 
 export const doneCount = computed(
   () => state.tickets.filter((t) => t.status === 'RESOLVED' || t.status === 'CLOSED').length
+)
+
+/** SLA 状态直接读取后端计算结果 */
+export const overdueCount = computed(
+  () => state.tickets.filter((t) => t.sla?.state === 'OVERDUE').length
+)
+
+export const warningCount = computed(
+  () => state.tickets.filter((t) => t.sla?.state === 'WARNING').length
 )
 
 export const urgentHighCount = computed(
@@ -136,8 +150,9 @@ export const typeDistribution = computed(() =>
 )
 
 /**
- * 趋势数据。新增按 createdAt 统计（准确）；
- * 已完成按 updatedAt 近似（后端暂无状态流转记录表）；处理中为当前处于处理中且创建于当日。
+ * 趋势数据。新增按 createdAt 统计；
+ * 已解决/关闭优先按 resolvedAt/closedAt，历史数据缺失时回退 updatedAt；
+ * 处理中为当前处于已接单/处理中且创建于当日。
  */
 export function buildTrend(days: number) {
   const labels: string[] = []
@@ -154,12 +169,18 @@ export function buildTrend(days: number) {
     labels.push(`${d.getMonth() + 1}/${d.getDate()}`)
     created.push(state.tickets.filter((t) => keyOf(t.createdAt) === key).length)
     resolved.push(
-      state.tickets.filter(
-        (t) => (t.status === 'RESOLVED' || t.status === 'CLOSED') && keyOf(t.updatedAt) === key
-      ).length
+      state.tickets.filter((t) => {
+        if (t.status !== 'RESOLVED' && t.status !== 'CLOSED') return false
+        const doneAt = t.resolvedAt ?? t.closedAt ?? t.updatedAt
+        return keyOf(doneAt) === key
+      }).length
     )
     running.push(
-      state.tickets.filter((t) => t.status === 'IN_PROGRESS' && keyOf(t.createdAt) === key).length
+      state.tickets.filter(
+        (t) =>
+          (t.status === 'ACCEPTED' || t.status === 'PROCESSING') &&
+          keyOf(t.createdAt) === key
+      ).length
     )
   }
   return { labels, created, resolved, running }
@@ -177,8 +198,10 @@ export function buildMyTodos(userName: string, isAdmin: boolean) {
   const mine = state.tickets.filter(
     (t) => isAdmin || t.creator === userName || t.assignee === userName
   )
-  const pending = mine.filter((t) => t.status === 'OPEN')
-  const assignedToMe = state.tickets.filter((t) => t.assignee === userName && t.status === 'OPEN')
-  const active = mine.filter((t) => t.status === 'IN_PROGRESS')
+  const pending = mine.filter((t) => t.status === 'PENDING')
+  const assignedToMe = state.tickets.filter(
+    (t) => t.assignee === userName && t.status === 'ASSIGNED'
+  )
+  const active = mine.filter((t) => t.status === 'ACCEPTED' || t.status === 'PROCESSING')
   return { pending, assignedToMe, active }
 }

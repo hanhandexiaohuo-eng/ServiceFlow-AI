@@ -17,7 +17,16 @@ public class Ticket {
     private String priority;
     private String status;
     private String creator;
+    private Long creatorId;
     private String assignee;
+    private Long assigneeId;
+    private LocalDateTime slaDueAt;
+    private LocalDateTime firstResponseAt;
+    private LocalDateTime resolvedAt;
+    private LocalDateTime closedAt;
+    private LocalDateTime cancelledAt;
+    private String resolution;
+    private String cancelReason;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -91,6 +100,78 @@ public class Ticket {
 
     public void setAssignee(String assignee) {
         this.assignee = assignee;
+    }
+
+    public Long getCreatorId() {
+        return creatorId;
+    }
+
+    public void setCreatorId(Long creatorId) {
+        this.creatorId = creatorId;
+    }
+
+    public Long getAssigneeId() {
+        return assigneeId;
+    }
+
+    public void setAssigneeId(Long assigneeId) {
+        this.assigneeId = assigneeId;
+    }
+
+    public LocalDateTime getSlaDueAt() {
+        return slaDueAt;
+    }
+
+    public void setSlaDueAt(LocalDateTime slaDueAt) {
+        this.slaDueAt = slaDueAt;
+    }
+
+    public LocalDateTime getFirstResponseAt() {
+        return firstResponseAt;
+    }
+
+    public void setFirstResponseAt(LocalDateTime firstResponseAt) {
+        this.firstResponseAt = firstResponseAt;
+    }
+
+    public LocalDateTime getResolvedAt() {
+        return resolvedAt;
+    }
+
+    public void setResolvedAt(LocalDateTime resolvedAt) {
+        this.resolvedAt = resolvedAt;
+    }
+
+    public LocalDateTime getClosedAt() {
+        return closedAt;
+    }
+
+    public void setClosedAt(LocalDateTime closedAt) {
+        this.closedAt = closedAt;
+    }
+
+    public LocalDateTime getCancelledAt() {
+        return cancelledAt;
+    }
+
+    public void setCancelledAt(LocalDateTime cancelledAt) {
+        this.cancelledAt = cancelledAt;
+    }
+
+    public String getResolution() {
+        return resolution;
+    }
+
+    public void setResolution(String resolution) {
+        this.resolution = resolution;
+    }
+
+    public String getCancelReason() {
+        return cancelReason;
+    }
+
+    public void setCancelReason(String cancelReason) {
+        this.cancelReason = cancelReason;
     }
 
     public LocalDateTime getCreatedAt() {

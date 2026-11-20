@@ -15,7 +15,7 @@ const points = computed(() => route.meta.points ?? [])
 <template>
   <div class="page">
     <section class="card">
-      <div class="badge">待接入</div>
+      <div class="badge">功能未启用</div>
       <span class="icon"><AppIcon name="layers" :size="24" /></span>
       <h1>{{ title }}</h1>
       <p v-if="group" class="group">{{ group }}</p>
@@ -37,7 +37,7 @@ const points = computed(() => route.meta.points ?? [])
       </div>
 
       <p class="footnote">
-        本页面为明确标注的「待接入」状态，未展示任何模拟数据。菜单已具备真实路由，不会出现点击无反应。
+        该功能尚未启用（功能开关关闭），不展示任何模拟数据或伪造界面。菜单已隐藏该入口，直接访问仅显示本说明页。
       </p>
     </section>
   </div>

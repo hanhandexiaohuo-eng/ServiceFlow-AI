@@ -31,12 +31,22 @@ defineProps<{ status: string }>()
   background: currentColor;
   flex: none;
 }
-.s-OPEN {
+.s-PENDING {
   color: #b45309;
   background: #fffbeb;
   border-color: #fde68a;
 }
-.s-IN_PROGRESS {
+.s-ASSIGNED {
+  color: #0369a1;
+  background: #f0f9ff;
+  border-color: #bae6fd;
+}
+.s-ACCEPTED {
+  color: #6d28d9;
+  background: #f5f3ff;
+  border-color: #ddd6fe;
+}
+.s-PROCESSING {
   color: #4338ca;
   background: #eef2ff;
   border-color: #c7d2fe;
@@ -50,5 +60,10 @@ defineProps<{ status: string }>()
   color: #475569;
   background: #f8fafc;
   border-color: #e2e8f0;
+}
+.s-CANCELLED {
+  color: #b91c1c;
+  background: #fef2f2;
+  border-color: #fecaca;
 }
 </style>

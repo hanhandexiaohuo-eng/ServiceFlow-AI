@@ -1,0 +1,7 @@
+# 构建产物、日志与本地缓存不进入镜像上下文
+target/
+logs/
+*.log
+*.log.*
+.idea/
+*.iml
